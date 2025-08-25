@@ -16,11 +16,14 @@ from datetime import datetime
 import requests
 import pandas as pd
 from tqdm import tqdm
+import sys
 
 # ====== Konštanty ======
-COLUMN_NAME = "Firma"
+DEFAULT_COLUMN_NAME = "Firma"
+DEFAULT_SHEET_NAME = None  # prvý hark
 RPO_BASE = "https://api.statistics.sk/rpo/v1/search"
 ONLY_ACTIVE = True
+INTERACTIVE_MODE = True
 
 # Limity / výkon
 MAX_WORKERS = 6
@@ -43,6 +46,78 @@ def setup_logging() -> Path:
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
     return logfile
+
+# ====== Excel handling ======
+def list_excel_sheets(file_path: Path) -> List[str]:
+    """
+    Vráti zoznam všetkých harkov v Excel súbore.
+    """
+    try:
+        excel_file = pd.ExcelFile(file_path)
+        return excel_file.sheet_names
+    except Exception as e:
+        logging.error(f"Chyba pri čítaní harkov z {file_path}: {e}")
+        return []
+
+def get_user_sheet_choice(sheets: List[str]) -> str:
+    """
+    Interaktívny výber harku používateľom.
+    """
+    if len(sheets) == 1:
+        print(f"Excel obsahuje jeden harok: '{sheets[0]}'")
+        return sheets[0]
+    
+    print(f"\nExcel súbor obsahuje harky: {sheets}")
+    while True:
+        choice = input(f"Vyber harok (stlač Enter pre '{sheets[0]}'): ").strip()
+        if not choice:
+            return sheets[0]
+        if choice in sheets:
+            return choice
+        print(f"Neplatný harok '{choice}'. Dostupné harky: {sheets}")
+
+def get_user_column_choice(df: pd.DataFrame, default: str = DEFAULT_COLUMN_NAME) -> str:
+    """
+    Interaktívny výber stĺpca používateľom.
+    """
+    columns = df.columns.tolist()
+    print(f"\nDostupné stĺpce: {columns}")
+    
+    while True:
+        choice = input(f"Zadaj názov stĺpca s firmami (Enter pre '{default}'): ").strip()
+        if not choice:
+            if default in columns:
+                return default
+            else:
+                print(f"Predvolený stĺpec '{default}' neexistuje. Vyber zo zoznamu.")
+                continue
+        if choice in columns:
+            return choice
+        print(f"Neplatný stĺpec '{choice}'. Dostupné stĺpce: {columns}")
+
+def validate_column_data(df: pd.DataFrame, column: str) -> bool:
+    """
+    Validuje dáta v stĺpci - kontroluje prázdne hodnoty a typ.
+    """
+    if column not in df.columns:
+        return False
+    
+    total_rows = len(df)
+    non_null_rows = df[column].notna().sum()
+    empty_rows = total_rows - non_null_rows
+    
+    if non_null_rows == 0:
+        print(f"⚠️  Stĺpec '{column}' je úplne prázdny!")
+        return False
+    
+    if empty_rows > 0:
+        print(f"⚠️  Stĺpec '{column}' obsahuje {empty_rows}/{total_rows} prázdnych hodnôt.")
+        choice = input("Pokračovať? (y/n): ").strip().lower()
+        if choice not in ['y', 'yes', 'a', 'ano', '']:
+            return False
+    
+    print(f"✅ Stĺpec '{column}' obsahuje {non_null_rows} validných záznamov.")
+    return True
 
 # ====== Normalizácia názvov ======
 LEGAL_FORMS_REGEX = re.compile(
@@ -247,6 +322,7 @@ def main():
     start_time = time.time()
     logging.info("==== RPO Lookup Started ====")
 
+    # 1. Získanie cesty k súboru
     src = input("Zadaj názov zdrojového Excel súboru (.xlsx), napr. firmy.xlsx: ").strip()
     if not src:
         print("Nebolo zadané meno súboru. Končím.")
@@ -259,17 +335,48 @@ def main():
         print("Očakávam .xlsx súbor.")
         return
 
+    # 2. Výber harku
+    sheets = list_excel_sheets(src_path)
+    if not sheets:
+        print("Nepodarilo sa načítať harky z Excel súboru.")
+        return
+    
+    selected_sheet = get_user_sheet_choice(sheets)
+    logging.info(f"Selected sheet: {selected_sheet}")
+    
+    # 3. Načítanie vybraného harku
+    try:
+        df = pd.read_excel(src_path, sheet_name=selected_sheet)
+    except Exception as e:
+        print(f"Chyba pri načítaní harku '{selected_sheet}': {e}")
+        return
+    
+    if df.empty:
+        print(f"Hark '{selected_sheet}' je prázdny.")
+        return
+    
+    # 4. Výber stĺpca
+    selected_column = get_user_column_choice(df, DEFAULT_COLUMN_NAME)
+    logging.info(f"Selected column: {selected_column}")
+    
+    # 5. Validácia dát v stĺpci
+    if not validate_column_data(df, selected_column):
+        print("Spracovanie prerušené kvôli problémom s dátami.")
+        return
+
+    # 6. Príprava výstupných súborov
     out_xlsx = src_path.with_name(f"{src_path.stem}_s_ICO.xlsx")
     out_csv  = src_path.with_name(f"{src_path.stem}_s_ICO.csv")
 
-    df = pd.read_excel(src_path)
-    if COLUMN_NAME not in df.columns:
-        raise ValueError(f"Vstupný Excel neobsahuje stĺpec '{COLUMN_NAME}'.")
+    # 7. Extrakcia a spracovanie dát
+    names = df[selected_column].astype(str).fillna("").tolist()
+    logging.info(f"Loaded {len(names)} companies from {src_path}, sheet '{selected_sheet}', column '{selected_column}'")
 
-    names = df[COLUMN_NAME].astype(str).fillna("").tolist()
-    logging.info(f"Loaded {len(names)} companies from {src_path}")
-
-    print(f"Začínam spracovanie {len(names)} firiem… (výstup: {out_xlsx.name}, {out_csv.name})")
+    print(f"\n📊 Začínam spracovanie {len(names)} firiem…")
+    print(f"📁 Hark: '{selected_sheet}'")
+    print(f"📋 Stĺpec: '{selected_column}'")
+    print(f"💾 Výstupy: {out_xlsx.name}, {out_csv.name}\n")
+    
     details = process_with_progress(names)
 
     df["CleanName"] = details["CleanName"]

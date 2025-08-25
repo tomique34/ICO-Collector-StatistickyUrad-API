@@ -27,6 +27,8 @@ Tento projekt automaticky dohľadáva identifikačné čísla organizácií (IČ
 - ✅ **Detailné logovanie** - komplexné záznamy do LOGS/ priečinka
 - ✅ **Interaktívne zadanie** - používateľ zadá cestu k súboru
 - ✅ **Rozšírené výsledky** - dodatočné informácie o zhode
+- ✅ **Nové: Podpora viacerých harkov** - interaktívny výber harku
+- ✅ **Nové: Dynamický výber stĺpca** - používateľ volí názov stĺpca s firmami
 
 ## Požiadavky na systém
 
@@ -84,16 +86,19 @@ Vytvorte Excel súbor (`.xlsx`) s týmito požiadavkami:
 ```bash
 python get_ico_chatgpt.py
 ```
-- Načíta súbor definovaný v konštante `INPUT_XLSX`
-- Prednastavené na `test_120firiem.xlsx` (upravte podľa potreby)
+- **Interaktívne zadávanie súboru** - používateľ volí Excel súbor
+- **Výber harku** - zobrazí dostupné harky a umožní výber
+- **Výber stĺpca** - zobrazí dostupné stĺpce a umožní výber
 - Vytvorí výstupné súbory s príponou `_s_ICO`
 
 ### Rozšírená verzia (ODPORÚČANÁ)
 ```bash
 python get_ico_v2.py
 ```
-- Interaktívne požiada o cestu k Excel súboru
-- Príklad: zadajte `firmy.xlsx`
+- **Interaktívne zadávanie súboru** - používateľ volí Excel súbor
+- **Výber harku** - zobrazí dostupné harky a umožní výber
+- **Výber stĺpca** - zobrazí dostupné stĺpce a umožní výber  
+- **Validácia dát** - kontrola prázdnych hodnôt pred spracovaním
 - Vytvorí výstupné súbory s príponou `_s_ICO`
 - Vytvorí log súbor v priečinku `LOGS/`
 
@@ -137,11 +142,27 @@ python get_ico_v2.py
 # Zadanie názvu súboru
 > Zadaj názov zdrojového Excel súboru (.xlsx), napr. firmy.xlsx: firmy.xlsx
 
-# Výsledok
-Začínam spracovanie 50 firiem… (výstup: firmy_s_ICO.xlsx, firmy_s_ICO.csv)
+# Výber harku (ak má súbor viacero harkov)
+> Excel súbor obsahuje harky: ['Sheet1', 'Firmy_SK', 'Companies']
+> Vyber hark (stlač Enter pre 'Sheet1'): Firmy_SK
+
+# Výber stĺpca
+> Dostupné stĺpce: ['Názov', 'Firma', 'Company_Name', 'Adresa']
+> Zadaj názov stĺpca s firmami (Enter pre 'Firma'): Názov
+
+# Validácia dát
+✅ Stĺpec 'Názov' obsahuje 50 validných záznamov.
+
+# Spracovanie
+📊 Začínam spracovanie 50 firiem…
+📁 Hark: 'Firmy_SK'
+📋 Stĺpec: 'Názov'
+💾 Výstupy: firmy_s_ICO.xlsx, firmy_s_ICO.csv
+
 Spracovanie firiem: 100%|██████████| 50/50 [01:05<00:00,  1.30s/firma]
-Hotovo: 48/50 nájdených IČO
-Výstupy uložené: firmy_s_ICO.xlsx  |  firmy_s_ICO.csv
+
+✅ Hotovo: 48/50 nájdených IČO
+📁 Výstupy: firmy_s_ICO.xlsx, firmy_s_ICO.csv
 Log súbor: LOGS/rpo_lookup_2025-08-25_14-30-15.log
 Celkový čas behu: 00:01:05
 ```

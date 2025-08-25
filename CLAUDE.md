@@ -22,6 +22,9 @@ Both scripts use the same core approach:
 
 ### Key Components
 
+- **Multi-Sheet Support**: Interactive selection of Excel sheets and columns
+- **Dynamic Column Selection**: User chooses column name containing company names
+- **Data Validation**: Checks for empty values and data quality before processing
 - **Name Normalization** (v2): Removes legal entity suffixes (s.r.o., a.s., etc.) and handles Slovak diacritics
 - **Rate Limiting**: Implements sliding window rate limiter to respect API limits (60 requests/minute)
 - **Concurrent Processing**: Uses ThreadPoolExecutor with configurable worker count

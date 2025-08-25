@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# Enhanced version with multi-sheet support and dynamic column selection
 
 import time
 import re
@@ -7,12 +8,14 @@ import requests
 import pandas as pd
 from typing import Optional, Dict, Any, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+import sys
 
 # ====== Konfigurácia ======
-INPUT_XLSX = "test_120firiem.xlsx"       # vstupný Excel so stĺpcom 'Firma' (zmeň podľa seba)
-OUTPUT_XLSX = "test_120firiem_s_ICO.xlsx"
-OUTPUT_CSV  = "test_120firiem_s_ICO.csv"
-COLUMN_NAME = "Firma"
+DEFAULT_INPUT_XLSX = "test_120firiem.xlsx"  # predvolený vstupný súbor
+DEFAULT_COLUMN_NAME = "Firma"
+DEFAULT_SHEET_NAME = None  # prvý hark
+INTERACTIVE_MODE = True
 
 RPO_BASE = "https://api.statistics.sk/rpo/v1/search"
 ONLY_ACTIVE = True
@@ -140,6 +143,99 @@ class RateLimiter:
         self.count += 1
 
 
+# ====== Excel handling ======
+def list_excel_sheets(file_path: Path) -> List[str]:
+    """
+    Vráti zoznam všetkých harkov v Excel súbore.
+    """
+    try:
+        excel_file = pd.ExcelFile(file_path)
+        return excel_file.sheet_names
+    except Exception as e:
+        print(f"Chyba pri čítaní harkov z {file_path}: {e}")
+        return []
+
+def get_user_sheet_choice(sheets: List[str]) -> str:
+    """
+    Interaktívny výber harku používateľom.
+    """
+    if len(sheets) == 1:
+        print(f"Excel obsahuje jeden hark: '{sheets[0]}'")
+        return sheets[0]
+    
+    print(f"\nExcel súbor obsahuje harky: {sheets}")
+    while True:
+        choice = input(f"Vyber hark (stlač Enter pre '{sheets[0]}'): ").strip()
+        if not choice:
+            return sheets[0]
+        if choice in sheets:
+            return choice
+        print(f"Neplatný hark '{choice}'. Dostupné harky: {sheets}")
+
+def get_user_column_choice(df: pd.DataFrame, default: str = DEFAULT_COLUMN_NAME) -> str:
+    """
+    Interaktívny výber stĺpca používateľom.
+    """
+    columns = df.columns.tolist()
+    print(f"\nDostupné stĺpce: {columns}")
+    
+    while True:
+        choice = input(f"Zadaj názov stĺpca s firmami (Enter pre '{default}'): ").strip()
+        if not choice:
+            if default in columns:
+                return default
+            else:
+                print(f"Predvolený stĺpec '{default}' neexistuje. Vyber zo zoznamu.")
+                continue
+        if choice in columns:
+            return choice
+        print(f"Neplatný stĺpec '{choice}'. Dostupné stĺpce: {columns}")
+
+def validate_column_data(df: pd.DataFrame, column: str) -> bool:
+    """
+    Validuje dáta v stĺpci - kontroluje prázdne hodnoty a typ.
+    """
+    if column not in df.columns:
+        return False
+    
+    total_rows = len(df)
+    non_null_rows = df[column].notna().sum()
+    empty_rows = total_rows - non_null_rows
+    
+    if non_null_rows == 0:
+        print(f"⚠️  Stĺpec '{column}' je úplne prázdny!")
+        return False
+    
+    if empty_rows > 0:
+        print(f"⚠️  Stĺpec '{column}' obsahuje {empty_rows}/{total_rows} prázdnych hodnôt.")
+        choice = input("Pokračovať? (y/n): ").strip().lower()
+        if choice not in ['y', 'yes', 'a', 'ano', '']:
+            return False
+    
+    print(f"✅ Stĺpec '{column}' obsahuje {non_null_rows} validných záznamov.")
+    return True
+
+def get_user_input_file() -> Optional[Path]:
+    """
+    Interaktívne získanie vstupného súboru.
+    """
+    while True:
+        src = input(f"Zadaj názov zdrojového Excel súboru (Enter pre '{DEFAULT_INPUT_XLSX}'): ").strip()
+        if not src:
+            src = DEFAULT_INPUT_XLSX
+        
+        src_path = Path(src)
+        if not src_path.exists():
+            print(f"Súbor '{src_path}' neexistuje. Skontroluj cestu/názov.")
+            continue
+        
+        if src_path.suffix.lower() != ".xlsx":
+            print("Očakávam .xlsx súbor.")
+            continue
+            
+        return src_path
+
+
 def process_names(names: List[str]) -> List[Optional[str]]:
     """
     Spracuje mená s paralelizáciou a rate-limitom (~60/min).
@@ -169,20 +265,64 @@ def process_names(names: List[str]) -> List[Optional[str]]:
 
 
 def main():
-    df = pd.read_excel(INPUT_XLSX)
-    if COLUMN_NAME not in df.columns:
-        raise ValueError(f"Vstupný Excel neobsahuje stĺpec '{COLUMN_NAME}'.")
+    print("🔍 ICO Collector - Základná verzia")
+    print("=" * 40)
+    
+    # 1. Získanie vstupného súboru
+    src_path = get_user_input_file()
+    if not src_path:
+        return
+    
+    # 2. Výber harku
+    sheets = list_excel_sheets(src_path)
+    if not sheets:
+        print("Nepodarilo sa načítať harky z Excel súboru.")
+        return
+    
+    selected_sheet = get_user_sheet_choice(sheets)
+    
+    # 3. Načítanie vybraného harku
+    try:
+        df = pd.read_excel(src_path, sheet_name=selected_sheet)
+    except Exception as e:
+        print(f"Chyba pri načítaní harku '{selected_sheet}': {e}")
+        return
+    
+    if df.empty:
+        print(f"Hark '{selected_sheet}' je prázdny.")
+        return
+    
+    # 4. Výber stĺpca
+    selected_column = get_user_column_choice(df, DEFAULT_COLUMN_NAME)
+    
+    # 5. Validácia dát v stĺpci
+    if not validate_column_data(df, selected_column):
+        print("Spracovanie prerušené kvôli problémom s dátami.")
+        return
 
-    names = df[COLUMN_NAME].astype(str).fillna("").tolist()
+    # 6. Príprava výstupných súborov
+    output_xlsx = src_path.with_name(f"{src_path.stem}_s_ICO.xlsx")
+    output_csv = src_path.with_name(f"{src_path.stem}_s_ICO.csv")
+
+    # 7. Extrakcia a spracovanie dát
+    names = df[selected_column].astype(str).fillna("").tolist()
+    
+    print(f"\n📊 Začínam spracovanie {len(names)} firiem…")
+    print(f"📁 Hark: '{selected_sheet}'")
+    print(f"📋 Stĺpec: '{selected_column}'")
+    print(f"💾 Výstupy: {output_xlsx.name}, {output_csv.name}\n")
+    
     icos = process_names(names)
 
+    # 8. Uloženie výsledkov
     df["ICO"] = icos
-    df.to_excel(OUTPUT_XLSX, index=False)
-    df.to_csv(OUTPUT_CSV, index=False, encoding="utf-8")
+    df.to_excel(output_xlsx, index=False)
+    df.to_csv(output_csv, index=False, encoding="utf-8")
 
+    # 9. Štatistiky
     ok = sum(1 for x in icos if x)
-    print(f"Hotovo: {ok}/{len(icos)} nájdených IČO")
-    print(f"Výstup: {OUTPUT_XLSX}, {OUTPUT_CSV}")
+    print(f"\n✅ Hotovo: {ok}/{len(icos)} nájdených IČO")
+    print(f"📁 Výstupy: {output_xlsx.name}, {output_csv.name}")
 
 
 if __name__ == "__main__":
