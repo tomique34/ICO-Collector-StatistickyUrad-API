@@ -1,0 +1,1 @@
+# Assets package for ICO Collector Streamlit App

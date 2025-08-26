@@ -20,7 +20,7 @@ import sys
 
 # ====== Konštanty ======
 DEFAULT_COLUMN_NAME = "Firma"
-DEFAULT_SHEET_NAME = None  # prvý hark
+DEFAULT_SHEET_NAME = None  # prvý harok
 RPO_BASE = "https://api.statistics.sk/rpo/v1/search"
 ONLY_ACTIVE = True
 INTERACTIVE_MODE = True

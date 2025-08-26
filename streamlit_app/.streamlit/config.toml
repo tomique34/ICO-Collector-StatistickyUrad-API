@@ -1,0 +1,38 @@
+[server]
+# Server configuration
+port = 8501
+address = "0.0.0.0"
+baseUrlPath = ""
+enableCORS = false
+enableXsrfProtection = false
+maxUploadSize = 200
+maxMessageSize = 200
+enableWebsocketCompression = false
+enableStaticServing = false
+runOnSave = false
+allowRunOnSave = false
+
+[browser]
+# Browser configuration  
+serverAddress = "localhost"
+gatherUsageStats = false
+
+[logger]
+# Logging configuration
+level = "info"
+messageFormat = "%(asctime)s %(message)s"
+
+[runner]
+# Runner configuration
+magicEnabled = true
+postScriptGC = true
+fastReruns = true
+enforceSerializableSessionState = false
+
+[theme]
+# Theme configuration
+primaryColor = "#1f77b4"
+backgroundColor = "#ffffff"  
+secondaryBackgroundColor = "#f0f2f6"
+textColor = "#262730"
+font = "sans serif"

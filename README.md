@@ -1,11 +1,23 @@
 # ICO Collector - Automatické získavanie IČO firiem
 
-**Verzia:** 2.0  
+**Verzia:** 2.1  
 **Dátum vytvorenia:** 25. august 2025  
 **Autor:** Tomas Vince  
 **Kontakt:** https://linkedin.com/in/tomasvince
 
-Tento projekt automaticky dohľadáva identifikačné čísla organizácií (IČO) slovenských firiem pomocou REST API Štatistického úradu SR. Skript načíta Excel súbor s názvami firiem a obohatí ich o IČO a ďalšie údaje z Registra právnych osôb (RPO).
+Tento projekt automaticky dohľadáva identifikačné čísla organizácií (IČO) slovenských firiem pomocou REST API Štatistického úradu SR. Poskytuje **konzolové skripty** aj **modernu webovu aplikáciu** pre jednoduchú prácu s Excel súbormi a automatické obohacovanie o IČO údaje z Registra právnych osôb (RPO).
+
+## 📋 Dostupné verzie
+
+### 🖥️ **Konzolové skripty** (Python)
+- `get_ico_chatgpt.py` - základná verzia
+- `get_ico_v2.py` - rozšírená verzia s pokročilými funkciami
+
+### 🌐 **Webová aplikácia** (Streamlit)
+- Moderné grafické rozhranie
+- Real-time progress monitoring  
+- Interaktívne grafy a štatistiky
+- Jednoduchý upload a download súborov
 
 ## Funkcionalita
 
@@ -80,9 +92,48 @@ Vytvorte Excel súbor (`.xlsx`) s týmito požiadavkami:
   ```
 
 
-## Spustenie skriptov
+## Spustenie aplikácií
 
-### Základná verzia
+### 🌐 Webová aplikácia (Streamlit) - ODPORÚČANÁ
+
+#### Lokálne spustenie
+```bash
+# 1. Prejdite do streamlit_app/ priečinka
+cd streamlit_app/
+
+# 2. Spustite quick setup (automatická inštalácia)
+./quick_setup.sh
+
+# 3. Alebo manuálne nastavenie:
+python3 -m venv ico_collector_env
+source ico_collector_env/bin/activate  # macOS/Linux
+# alebo ico_collector_env\Scripts\activate  # Windows
+pip install -r requirements_streamlit.txt
+
+# 4. Spustenie aplikácie
+streamlit run streamlit_app.py
+```
+
+Aplikácia bude dostupná na: **http://localhost:8501**
+
+#### Docker kontajner
+```bash
+# V streamlit_app/ priečinku
+docker build -t ico-collector-streamlit .
+docker run -p 8501:8501 ico-collector-streamlit
+```
+
+**Funkcie webovej aplikácie:**
+- 🎯 **Drag & drop upload** Excel súborov
+- 📊 **Real-time progress** monitoring
+- 📈 **Interaktívne grafy** - úspešnosť, stratégie zhody
+- 💾 **Jednoduché exporty** - Excel/CSV stiahnuť jedným klikom
+- 🔍 **Filtrovanie výsledkov** - úspešné/neúspešné/všetky
+- 📱 **Responzívne rozhranie** - funguje na mobile i desktop
+
+### 🖥️ Konzolové skripty
+
+#### Základná verzia
 ```bash
 python get_ico_chatgpt.py
 ```
@@ -91,7 +142,7 @@ python get_ico_chatgpt.py
 - **Výber stĺpca** - zobrazí dostupné stĺpce a umožní výber
 - Vytvorí výstupné súbory s príponou `_s_ICO`
 
-### Rozšírená verzia (ODPORÚČANÁ)
+#### Rozšírená verzia
 ```bash
 python get_ico_v2.py
 ```
@@ -128,7 +179,24 @@ V priečinku `LOGS/` - detailné záznamy o spracovaní:
 - Chybové stavy
 - Štatistiky úspešnosti
 
-## Príklad použitia
+## Príklady použitia
+
+### 🌐 Webová aplikácia (odporúčané)
+
+```bash
+# Quick start
+cd streamlit_app/
+./quick_setup.sh
+
+# Po spustení prejdite na http://localhost:8501
+# 1. Nahrajte Excel súbor pomocou drag & drop
+# 2. Vyberte hark a stĺpec s firmami  
+# 3. Kliknite na "Spracovať firmy"
+# 4. Sledujte real-time progress a výsledky
+# 5. Stiahnite výsledky jedným klikom (Excel/CSV)
+```
+
+### 🖥️ Konzolové skripty
 
 ```bash
 # Aktivácia virtuálneho prostredia
@@ -189,25 +257,60 @@ Projekt využíva REST API Štatistického úradu SR:
 
 ## Riešenie problémov
 
-### Chyba "ModuleNotFoundError"
+### Webová aplikácia (Streamlit)
+
+#### "Session state has no attribute" chyba
+```bash
+# Reštartujte aplikáciu
+Ctrl+C
+streamlit run streamlit_app.py
+```
+
+#### Streamlit sa nespustí
+```bash
+# Overte inštaláciu
+pip install streamlit
+streamlit --version
+
+# Alebo použite quick setup
+./quick_setup.sh
+```
+
+#### Docker problémy
+```bash
+# Znovu buildnite image
+docker build --no-cache -t ico-collector-streamlit .
+docker run -p 8501:8501 ico-collector-streamlit
+```
+
+### Konzolové skripty
+
+#### Chyba "ModuleNotFoundError"
 ```bash
 pip install -r requirements.txt
 ```
 
-### Chyba "File not found"
+#### Chyba "File not found"
 - Skontrolujte cestu k Excel súboru
 - Overte, že súbor má príponu `.xlsx`
 - Overte, že súbor obsahuje stĺpec "Firma"
 
-### Pomalé spracovanie
+### Všeobecné problémy
+
+#### Pomalé spracovanie
 - API má limit 60 požiadaviek/minútu
 - Pri veľkom počte firiem bude spracovanie trvať dlhšie
 - Neprekračujte odporúčané limity
 
-### API nedostupnosť
+#### API nedostupnosť
 - Skontrolujte internetové pripojenie
 - API môže byť dočasne nedostupné
 - Skript automaticky opakuje neúspešné pokusy
+
+#### Všetky firmy "neúspešné"
+- Overte názvy firiem v Excel súbore
+- Firmy musia existovať v slovenskom registri
+- Skúste známe slovenské firmy (napr. "Slovnaft", "Tesco Stores SR")
 
 ## Licencia
 

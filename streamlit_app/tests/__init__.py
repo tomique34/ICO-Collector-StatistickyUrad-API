@@ -1,0 +1,1 @@
+# Tests package for ICO Collector Streamlit App
